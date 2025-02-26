@@ -1,0 +1,14 @@
+peft
+accelerate
+torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+bitsandbytes==0.45.3
+trl
+transformers==4.49.0
+tqdm 
+scikit-learn
+evaluate
+rouge_score 
+nltk git+https://github.com/google-research/bleurt.git 
+sacrebleu 
+unbabel-comet 
+bert_score
