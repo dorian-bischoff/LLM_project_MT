@@ -121,7 +121,7 @@ def barPlot(title, metric_name, directions, results_per_model, colors, savepath=
     plt.close()
 
 
-def concatenate_results_parrPlot(directions, models, model_sizes, datasets, reduce_sizes, metrics_names, agg_keys, verbose=False):
+def concatenate_results_parrPlot(directions, models, model_sizes, datasets, reduce_sizes, metrics_names, agg_keys, additionnal_names=None, verbose=False):
     """
     agg_keys should be a list containing keys present in output dictonnary for every metrics desired
     for all metrics, can be only ["mean_score", "std_score", "std_unbias_score"] (or less)
@@ -143,10 +143,11 @@ def concatenate_results_parrPlot(directions, models, model_sizes, datasets, redu
     data = {key: [[] for _ in range(len(metrics))] for key in agg_keys}
     
     print("Extracting and concatenating metrics...")
+    additionnal_names = [None]*len(models) if additionnal_names is None else additionnal_names
     for dataset_name, reduce_size in zip(datasets, reduce_sizes):
-        for model_name, model_size in zip(models, model_sizes):
+        for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names):
             for direction in directions:
-                eval_filename = get_eval_filename(direction, dataset_name, model_name, model_size, reduce_size)
+                eval_filename = get_eval_filename(direction, dataset_name, model_name, model_size, reduce_size, additionnal_name)
                 if verbose:
                     print(eval_filename)
                 with open(eval_filename, "rb") as f:
@@ -160,9 +161,10 @@ def make_parallel_plot(directions,
                        models, model_sizes,
                        datasets, reduce_sizes,
                        metrics_names,
-                       list_colors_per, colors=None, verbose=False, savepath=None):
+                       list_colors_per, 
+                       additionnal_names = None, colors=None, verbose=False, savepath=None):
     # Aggregate eval data
-    data = concatenate_results_parrPlot(directions, models, model_sizes, datasets, reduce_sizes, metrics_names, agg_keys=["mean_score"], verbose=verbose)
+    data = concatenate_results_parrPlot(directions, models, model_sizes, datasets, reduce_sizes, metrics_names, agg_keys=["mean_score"], additionnal_names=additionnal_names, verbose=verbose)
     data = data["mean_score"]
 
     # Generate plot categories
@@ -175,7 +177,13 @@ def make_parallel_plot(directions,
         dataset_name2real_name_and_reduction[dataset_name] = dataset_name2real_name[dataset_name] + f" - reduct to {reduce_size} samples"
     category_names_data = [dataset_name2real_name_and_reduction[dataset_name] for dataset_name in datasets] if "dataset" in list_colors_per else []
     category_names_direction = directions if "direction" in list_colors_per else []
-    category_names_models = [get_full_model_name(model_name, model_size) for model_name, model_size in zip(models, model_sizes)] if "model" in list_colors_per else []
+
+    additionnal_names = [None]*len(models) if additionnal_names is None else additionnal_names
+    category_names_models = ([get_full_model_name(model_name, model_size, additionnal_name)
+                              for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names)]
+                              if "model" in list_colors_per
+                              else [])
+    print(category_names_models)
 
     ## Generate all combinaisons of categories
     category_names = []
@@ -193,12 +201,16 @@ def make_parallel_plot(directions,
     ## Get category name per element
     category = []
     for dataset_name in datasets:
-        for model_name, model_size in zip(models, model_sizes):
+        for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names):
             for direction in directions:
                 is_text = len(category_names_data)>0 and (len(category_names_direction)>0 or len(category_names_models)>0)
                 cat_name = (dataset_name2real_name_and_reduction[dataset_name] if len(category_names_data)>0 else "") + (" - " if is_text else "")
                 is_text = len(category_names_models)>0 and len(category_names_direction)>0
-                cat_name = cat_name + (get_full_model_name(model_name, model_size) if len(category_names_models)>0 else "") + (" - " if is_text else "")
+                cat_name = (cat_name
+                            + (get_full_model_name(model_name, model_size, additionnal_name)
+                                if len(category_names_models)>0
+                                else "")
+                            + (" - " if is_text else ""))
                 cat_name = cat_name + (direction if len(category_names_direction)>0 else "")
                 category.append(elem2cat[cat_name])
 
@@ -209,6 +221,8 @@ def make_parallel_plot(directions,
             colors = plt.cm.tab20.colors
         else:
             colors = plt.cm.Dark2.colors + plt.cm.tab10.colors[0:7] + plt.cm.tab10.colors[8:]
+    elif colors is None:
+        colors = plt.cm.Dark2.colors + plt.cm.tab10.colors[0:7] + plt.cm.tab10.colors[8:]
 
     # Plot
     print("Plotting in parallel coordinates plot...")
@@ -222,7 +236,7 @@ def make_parallel_plot(directions,
                             colors=colors,
                             savepath=savepath)
 
-def concatenate_results_barPlot(directions, models, model_sizes, dataset_name, reduce_size, metric_name, verbose=False):
+def concatenate_results_barPlot(directions, models, model_sizes, dataset_name, reduce_size, metric_name, additionnal_names=None, verbose=False):
     """
     for all metrics, can be only ["mean_score", "std_score", "std_unbias_score"] (or less)
     """
@@ -239,29 +253,31 @@ def concatenate_results_barPlot(directions, models, model_sizes, dataset_name, r
                              "BERTscore": "bertscore",
                              "METEOR": "meteor"}
     metric = metrics_names2metrics[metric_name]
-    results_per_model = {get_full_model_name(model_name, model_size): {"mean_score":[], "std_unbias_score":[]} for model_name, model_size in zip(models, model_sizes)}
+    additionnal_names = [None]*len(models) if additionnal_names is None else additionnal_names
+    results_per_model = {get_full_model_name(model_name, model_size, additionnal_name): {"mean_score":[], "std_unbias_score":[]} for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names)}
     
     print("Extracting and concatenating metrics...")
-    for model_name, model_size in zip(models, model_sizes):
+    for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names):
         for direction in directions:
-            eval_filename = get_eval_filename(direction, dataset_name, model_name, model_size, reduce_size)
+            eval_filename = get_eval_filename(direction, dataset_name, model_name, model_size, reduce_size, additionnal_name)
             if verbose:
                 print(eval_filename)
             with open(eval_filename, "rb") as f:
                 evaluations = pickle.load(f)
-            results_per_model[get_full_model_name(model_name, model_size)]["mean_score"].append(evaluations[metric]["mean_score"])
-            results_per_model[get_full_model_name(model_name, model_size)]["std_unbias_score"].append(evaluations[metric]["std_unbias_score"])
+            results_per_model[get_full_model_name(model_name, model_size, additionnal_name)]["mean_score"].append(evaluations[metric]["mean_score"])
+            results_per_model[get_full_model_name(model_name, model_size, additionnal_name)]["std_unbias_score"].append(evaluations[metric]["std_unbias_score"])
     return results_per_model
 
 def make_bar_plot(directions,
                     model_names, model_sizes,
                     dataset_name, reduce_size,
                     metric_names,
+                    additionnal_names = None,
                     cmap=None,
                     savepath = None):
     for metric_name in metric_names:
         title = f"{metric_name} translation evaluation on dataset {dataset_name} (mean score with unbiased std)"
-        results_per_model = concatenate_results_barPlot(directions, model_names, model_sizes, dataset_name, reduce_size, metric_name, verbose=False)
+        results_per_model = concatenate_results_barPlot(directions, model_names, model_sizes, dataset_name, reduce_size, metric_name, additionnal_names=additionnal_names, verbose=False)
         cmap = "Spectral" if cmap is None else cmap
         cmap_perso = ListedColormap(sns.color_palette(cmap, len(results_per_model)).as_hex())
         barPlot(title,
