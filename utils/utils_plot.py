@@ -94,10 +94,10 @@ def parallelCoordinatesPlot(title, N, data, category, ynames, colors=None, categ
 
 
 
-def barPlot(title, metric_name, directions, results_per_model, colors, savepath=None):
+def barPlot(title, metric_name, directions, results_per_model, colors, width=0.05, savepath=None):
 
     x = np.arange(len(directions))  # the label locations
-    width = 0.05  # the width of the bars
+    width = width  # the width of the bars
     multiplier = 0
     nb_model = len(results_per_model)
 
@@ -274,6 +274,7 @@ def make_bar_plot(directions,
                     metric_names,
                     additionnal_names = None,
                     cmap=None,
+                    width=0.05,
                     savepath = None):
     for metric_name in metric_names:
         title = f"{metric_name} translation evaluation on dataset {dataset_name} (mean score with unbiased std)"
@@ -284,5 +285,6 @@ def make_bar_plot(directions,
                 metric_name,
                 directions,
                 results_per_model,
+                width=width,
                 colors = cmap_perso.colors,
                 savepath = (savepath+f"_{metric_name}" if savepath is not None else None))

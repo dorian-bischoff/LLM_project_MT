@@ -20,8 +20,8 @@ def get_eval_filename(direction: str, dataset_name: str, model_name: str, model_
     Generate the pkl filename where to save the computed metrics
     """
     mod_size = "-"+model_size if model_size is not None else ""
-    additionnal_name = "" if additionnal_name is None else additionnal_name
-    return f"./evaluations/raw_{dataset_name}_{model_name}{mod_size}_{direction}_red-{reduce_size}_{additionnal_name}.pkl"
+    additionnal_name = "" if additionnal_name is None else f"_{additionnal_name}"
+    return f"./evaluations/raw_{dataset_name}_{model_name}{mod_size}_{direction}_red-{reduce_size}{additionnal_name}.pkl"
 
 def get_full_model_name(model_name, model_size, additionnal_name):
     return f"{model_name}"+(f"-{model_size}" if model_size is not None else "")+(f" - {additionnal_name}" if additionnal_name is not None else "")
