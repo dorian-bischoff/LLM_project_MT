@@ -10,6 +10,7 @@ import huggingface_hub
 from datasets import load_dataset, Dataset
 import transformers
 from transformers import BitsAndBytesConfig
+from peft import AutoPeftModelForCausalLM
 
 from .eval_params import num_beams, temperature, max_new_tokens, top_p
 from .utils_dataset import transform_to_WNT_style,  reduce_dataset
@@ -466,6 +467,51 @@ def translate_batched_MPT(inputs, model, tokenizer, batch_size, target_language)
         preds.extend(tslt)
     return preds
 
+#################################   Finetuned LLAMA NI
+def get_input_targets_LLAMA_finetuned(dataset, source_lang, target_lang):
+    language_name = {"en": "English", "de": "German", "ru": "Russian", "is": "Islandic", "zh": "Chinese", "cs": "Czech"}
+    source_lang_name = language_name[source_lang]
+    target_lang_name = language_name[target_lang]
+    # Use base formulation "Translate this from Chinese to English:\nChinese: 我爱机器翻译。\nEnglish:"
+    sources = [example[source_lang] for example in dataset[f"{source_lang}-{target_lang}"]]
+    inputs = [(
+        f"Translate the following text from {source_lang_name} to {target_lang_name}:"
+        + f"\n{source_lang_name}: {example.get(source_lang)} \n{target_lang_name}:")
+        for example in dataset[f"{source_lang}-{target_lang}"]]
+    targets = [example[target_lang] for example in dataset[f"{source_lang}-{target_lang}"]]
+    return sources, inputs, targets
+
+def translate_list_of_str_LLAMA_finetuned(list_str, tokenizer, model, target_language):
+    """
+    Returns a list containing str corresponding to translation of the inputted
+    """
+    language_name = {"en": "English", "de": "German", "ru": "Russian", "is": "Islandic", "zh": "Chinese", "cs": "Czech"}
+    with torch.no_grad():
+        inputs = tokenizer(list_str, return_tensors="pt", padding=True)
+        translated = model.generate(inputs["input_ids"].to(device),
+                                    attention_mask=inputs["attention_mask"].to(device),
+                                    num_beams=num_beams, 
+                                    do_sample=True,
+                                    temperature=temperature, 
+                                    top_p=top_p,
+                                    pad_token_id=tokenizer.pad_token_id
+                                    ).cpu()
+        translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
+        tgt_language_name = language_name[target_language]
+        translated_text = [t.split(f"{tgt_language_name}:")[2] for t in translated_text] # Remove prompt
+    return translated_text
+
+def translate_batched_LLAMA_finetuned(inputs, model, tokenizer, batch_size, target_language):
+    """
+    For 8GB VRAM, use batch_size=1
+    For 16GB VRAM, use batch_size=3
+    """
+    preds = []
+    for i in tqdm(range(len(inputs)//batch_size)):
+        tslt = translate_list_of_str_LLAMA_finetuned(inputs[i*batch_size : (i+1)*batch_size], tokenizer, model, target_language)
+        preds.extend(tslt)
+    return preds
+
 
 def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -> tuple:
     """
@@ -594,6 +640,24 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
         Q_config = BitsAndBytesConfig(load_in_8bit=True)
         model = transformers.AutoModelForCausalLM.from_pretrained("mosaicml/mpt-7b-instruct", torch_dtype="auto", device_map=device, quantization_config=Q_config)
         model.generation_config.pad_token_id = tokenizer.pad_token_id
+    elif model_name == "finetuned_llama3-3B":
+        bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type='nf4',
+        bnb_4bit_compute_dtype=getattr(torch, "float16"),
+        bnb_4bit_use_double_quant=False,
+    )
+        model = AutoPeftModelForCausalLM.from_pretrained(
+            "results/parallelData_finetuned-Llama3.2-3B",
+            device_map="auto",
+            torch_dtype=torch.float16,
+            quantization_config=bnb_config
+        )
+        tokenizer = transformers.AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B")
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
+    else:
+        raise ValueError("Not supported model. Try:[finetuned_llama3-3B, mpt, opt-instruct, bloomz, mistral, alma, nllb...]")
         
     return tokenizer, model
 
@@ -649,7 +713,11 @@ def get_support_fn_benchmark(model_name: str) -> tuple:
     elif model_name == "mpt":
         get_input_targets_fn = get_input_targets_MPT
         tslt_fn = translate_batched_MPT
-        
+    elif model_name == "finetuned_llama3-3B":
+        get_input_targets_fn = get_input_targets_LLAMA_finetuned
+        tslt_fn = translate_batched_LLAMA_finetuned
+    else:
+        raise ValueError("Not supported model. Try:[finetuned_llama3-3B, mpt, opt-instruct, bloomz, mistral, alma, nllb...]")
     return get_input_targets_fn, tslt_fn
 
 
