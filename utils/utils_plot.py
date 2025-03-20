@@ -183,7 +183,6 @@ def make_parallel_plot(directions,
                               for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names)]
                               if "model" in list_colors_per
                               else [])
-    print(category_names_models)
 
     ## Generate all combinaisons of categories
     category_names = []
