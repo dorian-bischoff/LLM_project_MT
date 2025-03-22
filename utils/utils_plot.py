@@ -72,7 +72,7 @@ def parallelCoordinatesPlot(title, N, data, category, ynames, colors=None, categ
         #   at one third towards the next axis; the first and last axis have one less control vertex
         # x-coordinate of the control vertices: at each integer (for the axes) and two inbetween
         # y-coordinate: repeat every point three times, except the first and last only twice
-        verts = list(zip([x for x in np.linspace(0, len(ys) - 1, len(ys) * 3 - 2, endpoint=True)],
+        verts = list(zip([x for x in np.linspace(0, len(ynames) - 1, len(ynames) * 3 - 2, endpoint=True)],
                          np.repeat(zs[j, :], 3)[1:-1]))
         # for x,y in verts: host.plot(x, y, 'go') # to show the control points of the beziers
         codes = [Path.MOVETO] + [Path.CURVE4 for _ in range(len(verts) - 1)]
