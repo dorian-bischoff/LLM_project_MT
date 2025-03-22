@@ -544,12 +544,13 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
         from credentials import hf_token
         huggingface_hub.login(token = hf_token)
         tokenizer = transformers.AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B")
-        nQ_cofig = BitsAndBytesConfig(load_in_4bit=True,
+        Q_config = BitsAndBytesConfig(load_in_4bit=True,
                                       bnb_4bit_quant_type="nf4",
                                       bnb_4bit_compute_dtype=getattr(torch, "float16"),
                                       bnb_4bit_use_double_quant=False)
         model = transformers.AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-3B", torch_dtype="auto", device_map=device, quantization_config=Q_config)
         tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
         model.generation_config.pad_token_id = tokenizer.pad_token_id
         
     elif model_name == "falcon3-mamba":
@@ -678,9 +679,9 @@ def get_support_fn_benchmark(model_name: str) -> tuple:
         get_input_targets_fn = get_input_targets_Llama3
         tslt_fn = translate_batched_Llama3
     
-    # elif model_name == "llama3-NI-4bit":
-    #     get_input_targets_fn = get_input_targets_Llama3NI4bit
-    #     tslt_fn = translate_batched_Llama3NI4bit
+    elif model_name == "llama3-NI-4bit":
+        get_input_targets_fn = get_input_targets_LLAMA_finetuned
+        tslt_fn = translate_batched_LLAMA_finetuned
     
     elif model_name == "falcon3-mamba":
         get_input_targets_fn = get_input_targets_Falcon3
