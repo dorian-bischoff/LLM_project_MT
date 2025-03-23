@@ -589,6 +589,7 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
     elif model_name == "bayling":
         tokenizer = transformers.AutoTokenizer.from_pretrained("ICTNLP/bayling-2-7b")
         tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
         Q_config = BitsAndBytesConfig(load_in_8bit=True)
         model = transformers.AutoModelForCausalLM.from_pretrained("ICTNLP/bayling-2-7b", torch_dtype="auto", device_map=device, quantization_config=Q_config)
     
@@ -622,12 +623,15 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
     elif model_name == "opt":
         if model_size=="0.1B":
             tokenizer = transformers.AutoTokenizer.from_pretrained("facebook/opt-125m")
+            tokenizer.padding_side = "left"
             model = transformers.AutoModelForCausalLM.from_pretrained("facebook/opt-125m", torch_dtype="auto", device_map=device)
         elif model_size=="0.3B":
             tokenizer = transformers.AutoTokenizer.from_pretrained("facebook/opt-350m")
+            tokenizer.padding_side = "left"
             model = transformers.AutoModelForCausalLM.from_pretrained("facebook/opt-350m", torch_dtype="auto", device_map=device)
         else:
             tokenizer = transformers.AutoTokenizer.from_pretrained("facebook/opt-6.7b")
+            tokenizer.padding_side = "left"
             Q_config = BitsAndBytesConfig(load_in_8bit=True)
             model = transformers.AutoModelForCausalLM.from_pretrained("facebook/opt-6.7b", torch_dtype="auto", device_map=device, quantization_config=Q_config)
     
@@ -638,9 +642,11 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
     elif model_name == "mpt":
         tokenizer = transformers.AutoTokenizer.from_pretrained("mosaicml/mpt-7b-instruct")
         tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
         Q_config = BitsAndBytesConfig(load_in_8bit=True)
         model = transformers.AutoModelForCausalLM.from_pretrained("mosaicml/mpt-7b-instruct", torch_dtype="auto", device_map=device, quantization_config=Q_config)
         model.generation_config.pad_token_id = tokenizer.pad_token_id
+
     elif model_name == "finetuned_llama3-3B":
         bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,

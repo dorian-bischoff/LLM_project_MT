@@ -120,6 +120,42 @@ def barPlot(title, metric_name, directions, results_per_model, colors, width=0.0
     plt.show()
     plt.close()
 
+def barPlotAllMetrics(metrics, results, bar_width, colors, title, savepath=None):
+    models = list(results.keys())
+    num_metrics = len(metrics)
+    num_models = len(models)
+    
+    rows, cols = 3, 4  # Arrange in 3 rows and 4 columns
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 4))
+    axes = axes.flatten()
+    
+    x_positions = np.arange(num_models) * bar_width  # Position within each group
+    
+    for i, metric in enumerate(metrics):
+        ax = axes[i]
+        means = [results[model]['mean_score'][i] for model in models]
+        stds = [results[model]['std_unbias_score'][i] for model in models]
+        
+        for j, model in enumerate(models):
+            ax.bar(x_positions[j], means[j], yerr=stds[j], capsize=5, width=bar_width, color=colors[j % len(colors)], alpha=0.7, label=model if i == 0 else "")
+        
+        ax.set_title(metric)
+        ax.set_xticks([])  # Remove x-ticks to keep it clean
+        ax.set_ylabel(metric)
+    
+    for i in range(num_metrics, rows * cols):
+        fig.delaxes(axes[i])  # Remove unused subplots if metrics < 12
+    
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.05), ncol=len(results)//2, fancybox=True, shadow=True)
+    fig.suptitle(title, fontsize=14)
+    
+    plt.tight_layout(rect=[0, 0.1, 1, 0.95])
+    if savepath is not None:
+        plt.savefig(savepath)
+    plt.show()
+    plt.close()
+
 
 def concatenate_results_parrPlot(directions, models, model_sizes, datasets, reduce_sizes, metrics_names, agg_keys, additionnal_names=None, verbose=False):
     """
@@ -287,3 +323,57 @@ def make_bar_plot(directions,
                 width=width,
                 colors = cmap_perso.colors,
                 savepath = (savepath+f"_{metric_name}" if savepath is not None else None))
+
+
+def concatenate_results_barPlotAllMetrics(direction, models, model_sizes, dataset_name, reduce_size, metric_names, additionnal_names=None, verbose=False):
+    """
+    for all metrics, can be only ["mean_score", "std_score", "std_unbias_score"] (or less)
+    """
+    metrics_names2metrics = {"ROUGE-1": "rouge1",
+                             "ROUGE-2": "rouge2",
+                             "ROUGE-L": "rougeL",
+                             "ROUGE-Lsum": "rougeLsum",
+                             "BLEU": "bleu",
+                             "SacreBLEU": "sacrebleu",
+                             "chrF": "chrf",
+                             "chrF++": "chrfplusplus",
+                             "COMET": "comet",
+                             "BLEURT": "bleurt",
+                             "BERTscore": "bertscore",
+                             "METEOR": "meteor"}
+    additionnal_names = [None]*len(models) if additionnal_names is None else additionnal_names
+    results_per_model = {get_full_model_name(model_name, model_size, additionnal_name): {"mean_score":[], "std_unbias_score":[]} for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names)}
+    
+    print("Extracting and concatenating metrics...")
+    for model_name, model_size, additionnal_name in zip(models, model_sizes, additionnal_names):
+        eval_filename = get_eval_filename(direction, dataset_name, model_name, model_size, reduce_size, additionnal_name)
+        if verbose:
+            print(eval_filename)
+        with open(eval_filename, "rb") as f:
+            evaluations = pickle.load(f)
+        for metric_name in metric_names:
+            metric = metrics_names2metrics[metric_name]
+            results_per_model[get_full_model_name(model_name, model_size, additionnal_name)]["mean_score"].append(evaluations[metric]["mean_score"])
+            results_per_model[get_full_model_name(model_name, model_size, additionnal_name)]["std_unbias_score"].append(evaluations[metric]["std_unbias_score"])
+    return results_per_model
+
+
+def make_bar_plot_all_metrics(directions,
+                    model_names, model_sizes,
+                    dataset_name, reduce_size,
+                    metric_names,
+                    additionnal_names = None,
+                    cmap=None,
+                    width=0.05,
+                    savepath = None):
+    for direction in directions:
+        title = f"Translation evaluation on dataset {dataset_name} for direction {direction} (mean score with unbiased std)"
+        results_per_model = concatenate_results_barPlotAllMetrics(direction, model_names, model_sizes, dataset_name, reduce_size, metric_names, additionnal_names=additionnal_names)
+        cmap = "Spectral" if cmap is None else cmap
+        cmap_perso = ListedColormap(sns.color_palette(cmap, len(results_per_model)).as_hex())
+        barPlotAllMetrics(metric_names,
+                          results_per_model,
+                          bar_width=width,
+                          colors=cmap_perso.colors,
+                          title = title,
+                          savepath = (savepath+f"_{direction}" if savepath is not None else None))
