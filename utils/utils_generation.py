@@ -419,7 +419,7 @@ def translate_list_of_str_OPT(list_str, tokenizer, model, target_language):
                                     ).cpu()
         translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
         tgt_language_name = language_name[target_language]
-        translated_text = [t.split(f"{tgt_language_name}:")[2] for t in translated_text] # Remove prompt
+        translated_text = [t.split(f"{tgt_language_name}:")[-1] for t in translated_text] # Remove prompt
         translated_text = [t.split(f"\n[END]")[0] for t in translated_text]
     return translated_text
 
@@ -538,6 +538,7 @@ def load_model_benchmark(model_name: str, model_size: Union[str, None] = None) -
             nQ_cofig = BitsAndBytesConfig(load_in_8bit=True)
             model = transformers.AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct", torch_dtype="auto", device_map=device, quantization_config=Q_config)
         tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "left"
         model.generation_config.pad_token_id = tokenizer.pad_token_id
     
     elif model_name == "llama3-NI-4bit":
